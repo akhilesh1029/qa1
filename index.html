@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Anonymous Q&A</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #e0eafc, #cfdef3);
+      color: #111;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 50px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    h1, h2 {
+      color: #111;
+    }
+
+    select, textarea, button, input[type="email"] {
+      font-size: 1em;
+      margin-top: 10px;
+    }
+
+    textarea, input[type="email"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      resize: vertical;
+      color: #111;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #0056b3;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #003f7f;
+    }
+
+    .question {
+      background-color: #f9f9f9;
+      margin-bottom: 20px;
+      padding: 15px;
+      border-radius: 12px;
+      color: #111;
+    }
+
+    .question p {
+      background-color: #e8f5e9;
+      padding: 10px;
+      border-radius: 8px;
+      color: #111;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="mainApp">
+    <h1>🎓 Askly - Ask Seniors (Q&A)</h1>
+
+    <h2>📝 Post your question</h2>
+
+    <label for="category">Choose a Category:</label><br>
+    <select id="category">
+      <option value="Academics">📚 Academics</option>
+      <option value="Hostel">🏠 Hostel</option>
+      <option value="Placement">💼 Placement</option>
+      <option value="Clubs">🎉 Clubs & Events</option>
+      <option value="Other">❓ Others</option>
+    </select><br><br>
+
+    <textarea id="question" placeholder="Type your question here..." rows="5"></textarea><br><br>
+
+    <button onclick="postQuestion()">🚀 Submit Anonymously</button>
+
+    <hr>
+
+    <h2>📋 All Questions</h2>
+    <div id="questionList"></div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-auth-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDW5fqbQyeFFeXNBZDJaNvLJJed5zWdKkQ",
+      authDomain: "askly-f3147.firebaseapp.com",
+      databaseURL: "https://askly-f3147-default-rtdb.firebaseio.com",
+      projectId: "askly-f3147",
+      storageBucket: "askly-f3147.appspot.com",
+      messagingSenderId: "148351754620",
+      appId: "1:148351754620:web:1e33f0faa43a1ec04ac4f9",
+      measurementId: "G-R4836RH0Y7"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const auth = firebase.auth();
+
+    const allowedDomains = ["xyzcollege.edu"];
+
+    let currentUser = null;
+
+    function checkAuthAndRedirect(questionId, replyText) {
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          const email = user.email;
+          const domain = email.split('@')[1];
+          if (allowedDomains.includes(domain)) {
+            database.ref('questions/' + questionId).update({
+              answer: replyText
+            });
+            alert("✅ Answer submitted!");
+          } else {
+            alert("Only verified XYZ College students can answer.");
+            auth.signOut();
+          }
+        } else {
+          localStorage.setItem("questionToAnswer", questionId);
+          localStorage.setItem("replyText", replyText);
+          window.location.href = "login.html";
+        }
+      });
+    }
+
+    function postQuestion() {
+      const category = document.getElementById('category').value;
+      const question = document.getElementById('question').value.trim();
+
+      if (!question) {
+        alert("Please type your question.");
+        return;
+      }
+
+      const timestamp = new Date().toISOString();
+
+      database.ref('questions').push({
+        category,
+        question,
+        timestamp
+      });
+
+      alert("✅ Question posted anonymously!");
+      document.getElementById('question').value = '';
+    }
+
+    const questionList = document.getElementById('questionList');
+    database.ref('questions').on('value', (snapshot) => {
+      questionList.innerHTML = '';
+      snapshot.forEach((childSnapshot) => {
+        const data = childSnapshot.val();
+        const questionId = childSnapshot.key;
+
+        const div = document.createElement('div');
+        div.className = 'question';
+        div.innerHTML = `
+          <strong>${data.category}</strong>: ${data.question}<br>
+          <div id="answer-${questionId}">
+            ${data.answer ? `<p><strong>👨‍🏫 Answer:</strong> ${data.answer}</p>` : ''}
+          </div>
+          <div id="replyBox-${questionId}" style="margin-top: 10px;">
+            <textarea id="replyInput-${questionId}" rows="2" placeholder="Type your reply..."></textarea><br>
+            <button onclick="submitReply('${questionId}')">✅ Submit Answer</button>
+          </div>
+        `;
+
+        questionList.prepend(div);
+      });
+    });
+
+    function submitReply(questionId) {
+      const replyText = document.getElementById(`replyInput-${questionId}`).value.trim();
+
+      if (!replyText) {
+        alert("Please type an answer.");
+        return;
+      }
+
+      checkAuthAndRedirect(questionId, replyText);
+    }
+  </script>
+</body>
+</html>
